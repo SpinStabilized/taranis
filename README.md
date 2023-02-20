@@ -165,6 +165,27 @@ Contributions are what make the open source community such an amazing place to b
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+<!-- Refrences -->
+## References
+
+### Converting Midi Ticks to Seconds
+
+> The formula is 60000 / (BPM * PPQ) (milliseconds).
+> 
+> Where BPM is the tempo of the track (Beats Per Minute).
+> 
+> (i.e. a 120 BPM track would have a MIDI time of (60000 / (120 * 192)) or
+> 2.604 ms for 1 tick.
+> 
+> If you don't know the BPM then you'll have to determine that first. MIDI
+> times are entirely dependent on the track tempo.
+
+```math
+ms = \frac{60000}{BPM \times PPQ}
+```
+
+Aaronaught. “Converting MIDI Ticks to Actual Playback Seconds - Response.” Stack Overflow, January 10, 2010. https://stackoverflow.com/a/2038364. 
+
 
 <!-- LICENSE -->
 ## License
@@ -203,3 +224,4 @@ Project Link: [https://github.com/SpinStabilized/taranis](https://github.com/Spi
 <!-- [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/othneildrew -->
 <!-- [product-screenshot]: resources/dbot_screenshot.png -->
+[so-ticks-to-secs]: https://stackoverflow.com/a/2038364

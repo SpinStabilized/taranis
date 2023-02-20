@@ -9,17 +9,14 @@ Plans -
 
 """
 from __future__ import annotations
+import mido
+import pathlib
 
-from mido import MidiFile
+from typing import Any
 
-test_song1 = '/home/brian/taranis/resources/skye.mid'
+import utils.utils as utils
 
-midi = MidiFile(test_song1)
-
-tracks = midi.tracks[1]
-
-for msg in track:
-    print(msg, msg.type)
+logger = utils.taranis_logger_config()
 
 def note_to_f(note: int, tuning: int=440) -> float: 
     """Convert a MIDI note to frequency.
@@ -33,15 +30,34 @@ def note_to_f(note: int, tuning: int=440) -> float:
     """
     return (2**((note-69)/12)) * tuning
 
+def main():
+    logger.info('Taranis starting up.')
+    test_song1: pathlib.Path = pathlib.Path('../resources/skye.mid')
+    test_song2: pathlib.Path = pathlib.Path('../resources/Mortal_Kombat.mid')
 
-# Aaronaught
-# https://stackoverflow.com/questions/2038313/converting-midi-ticks-to-actual-playback-seconds
-# The formula is 60000 / (BPM * PPQ) (milliseconds).
+    test_song: pathlib.Path = test_song2
 
-# Where BPM is the tempo of the track (Beats Per Minute).
+    logger.info(f'Loading {test_song}')
+    midi = mido.MidiFile(test_song1)
 
-# (i.e. a 120 BPM track would have a MIDI time of (60000 / (120 * 192)) or
-# 2.604 ms for 1 tick.
+    if len(midi.tracks) == 0:
+        logger.error(f'No tracks found in {test_song}. Nothing to process.')
+    else:
+        tempo: int =  mido.bpm2tempo(120)
+        tick: int = 0
+        for i, track in enumerate(midi.tracks):
+            logger.info(f'Processing {test_song} track {i}.')
 
-# If you don't know the BPM then you'll have to determine that first. MIDI
-# times are entirely dependent on the track tempo.
+            for msg in track[:5]:
+                print(msg)
+
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info('Exiting on Ctrl-C')
+        raise SystemExit
+    except SystemExit:
+        raise
