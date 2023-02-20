@@ -1,6 +1,9 @@
 # Application specific ignores
 logs/
 
+# IDE ignores
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
