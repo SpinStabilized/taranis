@@ -31,9 +31,10 @@ def note_to_f(note: int, tuning: int=440) -> float:
     return (2**((note-69)/12)) * tuning
 
 class AbsoluteMessage:
-    def __init__(self, message: mido.Message, tick: int) -> None:
+    def __init__(self, message: mido.Message, tick: int, tuning: float = 440.0) -> None:
         self.message: mido.Message = message
         self.tick: int = tick
+        self.tuning: float = tuning
     
     def __repr__(self) -> str:
         return f'<{repr(self.message)}, tick={self.tick}, f={self.frequency}>'
@@ -53,8 +54,7 @@ class AbsoluteMessage:
         Returns:
             The frequency in Hertz of the note.
         """
-        tuning: float = 440.0
-        return (2 ** ((self.message.note - 69) / 12)) * tuning if self.is_note else 0.0
+        return (2 ** ((self.message.note - 69) / 12)) * self.tuning if self.is_note else 0.0
 
 
 def main() -> None:
