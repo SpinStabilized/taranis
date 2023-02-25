@@ -11,51 +11,15 @@ Plans -
 from __future__ import annotations
 import mido
 import pathlib
+import struct
+import wave
 
 from typing import Any
 
-import utils.utils as utils
+import utils
+import taranislib
 
 logger = utils.taranis_logger_config()
-
-def note_to_f(note: int, tuning: int=440) -> float: 
-    """Convert a MIDI note to frequency.
-
-    Args:
-       note: A MIDI note
-       tuning: The tuning as defined by the frequency for A4.
-    
-    Returns:
-        The frequency in Hertz of the note.
-    """
-    return (2**((note-69)/12)) * tuning
-
-class AbsoluteMessage:
-    def __init__(self, message: mido.Message, tick: int, tuning: float = 440.0) -> None:
-        self.message: mido.Message = message
-        self.tick: int = tick
-        self.tuning: float = tuning
-    
-    def __repr__(self) -> str:
-        return f'<{repr(self.message)}, tick={self.tick}, f={self.frequency}>'
-
-    @property
-    def is_note(self) -> bool:
-        return 'note' in self.message.type
-
-    @property
-    def frequency(self) -> float:
-        """Convert a MIDI note to frequency.
-
-        Args:
-        note: A MIDI note
-        tuning: The tuning as defined by the frequency for A4.
-        
-        Returns:
-            The frequency in Hertz of the note.
-        """
-        return (2 ** ((self.message.note - 69) / 12)) * self.tuning if self.is_note else 0.0
-
 
 def main() -> None:
     logger.info('Taranis starting up.')
@@ -66,67 +30,157 @@ def main() -> None:
     test_song: pathlib.Path = test_song2
 
     logger.info(f'Loading {test_song.name}')
-    midi = mido.MidiFile(test_song1)
+    midi = mido.MidiFile(test_song)
 
     if len(midi.tracks) == 0:
         logger.error(f'No tracks found in {test_song.name}. Nothing to process.')
-    else:
-        tempo: int =  mido.bpm2tempo(120)
-        tick: int = 0
-        notes_track: int = -1
-        control_tracks: list[int] = []
-        
-        for i, track in enumerate(midi.tracks):
-            logger.info(f'Processing {test_song.name} track {i}.')
-            notes: int = len([msg for msg in track if msg.type == 'note_on' ])
-            if notes > 0:
-                if notes_track == -1:
-                    notes_track = i
-                else:
-                    logger.warning(f'Track {i} has notes but track {notes_track} already has notes. Track {i} will be ignored.')
-            else:
-                control_tracks.append(i)
-        
-        logger.info(f'Notes will be taken from track {notes_track}.')
-        logger.info(f'Control messages will also be processed from tracks: {control_tracks}')
+        return
+    
 
-        messages_to_ignore: list[str] = [
-            'time_signature',
-            'key_signature',
-            'end_of_track',
-            'channel_prefix',
-            'program_change',
-        ]
-        absolute: list[AbsoluteMessage] = []
-        for track_number in control_tracks + [notes_track]:
-            logger.info(f'Processing track {track_number}.')
-            tick = 0
-            note_on: int = -1
-            for message in midi.tracks[track_number]:
-                tick += message.time
+    notes_track: int = -1
+    control_tracks: list[int] = []
+    
+    for i, track in enumerate(midi.tracks):
+        logger.info(f'Processing {test_song.name} track {i}.')
+        notes: int = len([msg for msg in track if msg.type == 'note_on' ])
+        if notes > 0:
+            if notes_track == -1:
+                notes_track = i
+            else:
+                logger.warning(f'Track {i} has notes but track {notes_track} already has notes. Track {i} will be ignored.')
+        else:
+            control_tracks.append(i)
+    
+    logger.info(f'Notes will be taken from track {notes_track}.')
+    logger.info(f'Control messages will also be processed from tracks: {control_tracks}')
+
+    messages_to_ignore: list[str] = [
+        'time_signature',
+        'key_signature',
+        'end_of_track',
+        'channel_prefix',
+        'program_change',
+    ]
+
+    note_messages: list[taranislib.TaranisMessage] = []
+    control_messages: list[taranislib.TaranisMessage] = []
+    for track_number in control_tracks + [notes_track]:
+        logger.info(f'Processing track {track_number}.')
+        tick = 0
+        note_on: int = -1
+        track: mido.MidiTrack = midi.tracks[track_number]
+        for mido_message in track:
+            message: taranislib.TaranisMessage = taranislib.TaranisMessage(mido_message)
+            tick += message.time
+            if message.is_note:
                 if message.type == 'note_on' and note_on == -1:
                     note_on = message.note
-                    absolute.append(AbsoluteMessage(message, tick))
+                    message.tick = tick
+                    note_messages.append(message)
                 elif message.type == 'note_on' and note_on != -1:
                     logger.warning(f'Note On when another note is aleady on. Ignoring.')
                 elif message.type == 'note_off' and message.note == note_on:
                     note_on = -1
-                    absolute.append(AbsoluteMessage(message, tick))
+                    message.tick = tick
+                    note_messages.append(message)
                 elif message.type == 'note_off' and message.note != note_on:
                     logger.warning(f'Note Off for note not already on. Ignoring.')
-                elif message.type in messages_to_ignore:
-                    logger.warning(f'Message of type "{message.type}" ignored.')
-                else:
-                    absolute.append(AbsoluteMessage(message, tick))
+            else:
+                message.tick = tick
+                control_messages.append(message)
+    
+    control_messages.sort(reverse=True, key=lambda message: message.tick)
+    note_messages.reverse()
+
+    logger.info(f'Starting score generation.')
+    tempo: int =  mido.bpm2tempo(120)
+    ticks_per_beat: int = midi.ticks_per_beat
+    logger.info(f'Ticks/Beat = {ticks_per_beat}')
+    max_ticks: int = max([m.tick for m in control_messages if m.type == 'end_of_track'])
+    score_notes: list[taranislib.Note] = []
+    t: int = 0
+    current_note: taranislib.Note | None = None
+    m: taranislib.TaranisMessage
+    # print(note_messages)
+    while t <= max_ticks:
+        if control_messages and control_messages[-1].tick == t:
+            m = control_messages.pop()
+            match m.type:
+                case 'set_tempo':
+                    tempo = m.message.dict()['tempo']
+                    logger.info(f'Setting tempo to {tempo}.')
+                case 'program_change' | 'control_change':
+                    # Control Messages that are not processed
+                    logger.warning(f'Ignoring "{m.type}" message.')
+                case 'channel_prefix' | 'end_of_track' | 'key_signature' | 'time_signature':
+                    # Meta Message Processing
+                    logger.warning(f'Ignoring "{m.type}" meta message')
+                case _:
+                    logger.warning(f'Unknown Control Message: "{m.message}"')
+
+        elif note_messages and note_messages[-1].tick == t:
+            m = note_messages.pop()
+            match m.type:
+                case 'note_on':
+                    if current_note:
+                        logger.warning(f'Ignoring "note_on" at tick {m.tick} as a note is already on.')
+                    else:
+                        current_note = taranislib.Note(t, m.note, tempo=tempo, ticks_per_beat=ticks_per_beat)
+                        # logger.info(f'Note {m.note} on at tick {t}')
+                case 'note_off':
+                    if current_note and current_note.note_number == m.note:
+                        current_note.end = t
+                        score_notes.append(current_note)
+                        current_note = None
+                        # logger.info(f'Note {m.note} off at tick {t}')
+                    elif current_note and current_note.note_number != m.note:
+                        logger.warning(f'Ignoring "note_off" at tick {m.tick} that does not match currently on note.')
+                    else:
+                        logger.warning(f'Ignoring "note_off" at tick {m.tick} when no note is on.')
+                case _:
+                    logger.warning(f'Ignoring note message "{m.type}" that I don\'t know how to process.')
+
+        else:
+            t += 1
+
+    logger.info('Adding in rests.')
+    t = 0
+    score: list[taranislib.Note] = []
+    for n in score_notes:
+        delta = n.start - t
+        if delta > 1:
+            # logger.info(f'Silence Delta = {delta}')
+            rest = taranislib.Rest(t, n.start - 1, tempo=tempo, ticks_per_beat=ticks_per_beat)
+            # logger.info(f'Adding a {rest.duration} tick rest at {t} ticks.')
+            score.append(rest)
+            t = n.end + 1
         
-        absolute.sort(key=lambda x:x.tick)
-        max_ticks: int = absolute[-1].tick
-        # print(absolute[:10])
+        score.append(n)
 
+    logger.info('Generating audio samples.')
+    rate = 44100
+    audio: list[int] = []
+    for n in score:
+        audio += n.get_samples(rate)
 
-            
+    # Open up a wav file
+    # consider switching to https://pypi.org/project/wavfile/
+    output_file: pathlib.Path = test_song.parent / (test_song.stem + '.wav')
+    wav_file = wave.open(str(output_file),"w")
 
+    nchannels = 1               # mono
+    samp_width = 2              # 16-bit samples (2 bytes)
+    nframes = len(audio)
+    comptype = "NONE"           # The only value supported by the python wave module
+    compname = "not compressed" # The only value supported by the python wave module
+    wav_file.setparams((nchannels, samp_width, rate, nframes, comptype, compname))
 
+    logger.info('Writing to wav file.')
+    for sample in audio:
+        wav_file.writeframes(struct.pack('h', sample))
+
+    wav_file.close()
+        
 if __name__ == "__main__":
     try:
         main()

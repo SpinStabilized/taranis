@@ -1,5 +1,6 @@
 # Application specific ignores
 logs/
+*.wav
 
 # IDE ignores
 .vscode/
