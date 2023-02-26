@@ -70,10 +70,15 @@ class Note:
     #     n: float = self.duration_s / p
 
     def get_samples(self, rate: int) -> list[int]:
-        duration: float = mido.tick2second(self.duration, self.ticks_per_beat, self.tempo) * 1000
+        duration: float = self.duration_s * 1000
+        period: float = 1 / self.frequency
+        waves: float = self.duration_s / period
+        duration = math.floor(waves * period * 1000)
+        # duration = math.floor(self.duration_s / (1 / self.frequency)) * 1000
         num_samples: int = math.floor(duration * (rate / 1000.0))
         frequency: float = self.frequency
         samples_float: list[float] = [1.0 * math.sin(2 * math.pi * frequency * ( x / rate )) for x in range(num_samples)]
+        # samples_int: list[int] = [int(s * 32767) for s in samples_float]
         samples_int: list[int] = [32767 if s > 0 else -32768 for s in samples_float]
         return samples_int
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import mido
 import pathlib
 import struct
+import tqdm
 import wave
 
 from typing import Any
@@ -54,13 +55,13 @@ def main() -> None:
     logger.info(f'Notes will be taken from track {notes_track}.')
     logger.info(f'Control messages will also be processed from tracks: {control_tracks}')
 
-    messages_to_ignore: list[str] = [
-        'time_signature',
-        'key_signature',
-        'end_of_track',
-        'channel_prefix',
-        'program_change',
-    ]
+    # messages_to_ignore: list[str] = [
+    #     'time_signature',
+    #     'key_signature',
+    #     'end_of_track',
+    #     'channel_prefix',
+    #     'program_change',
+    # ]
 
     note_messages: list[taranislib.TaranisMessage] = []
     control_messages: list[taranislib.TaranisMessage] = []
@@ -108,7 +109,7 @@ def main() -> None:
             match m.type:
                 case 'set_tempo':
                     tempo = m.message.dict()['tempo']
-                    logger.info(f'Setting tempo to {tempo}.')
+                    logger.info(f'Setting tempo to {tempo} ({mido.tempo2bpm(tempo)} BPM).')
                 case 'program_change' | 'control_change':
                     # Control Messages that are not processed
                     logger.warning(f'Ignoring "{m.type}" message.')
@@ -150,12 +151,14 @@ def main() -> None:
         delta = n.start - t
         if delta > 1:
             # logger.info(f'Silence Delta = {delta}')
-            rest = taranislib.Rest(t, n.start - 1, tempo=tempo, ticks_per_beat=ticks_per_beat)
+            rest = taranislib.Rest(t, n.start, tempo=tempo, ticks_per_beat=ticks_per_beat)
             # logger.info(f'Adding a {rest.duration} tick rest at {t} ticks.')
             score.append(rest)
-            t = n.end + 1
+        t = n.end + 1
         
         score.append(n)
+    # for n in score:
+    #     print(n.duration_s)
 
     logger.info('Generating audio samples.')
     rate = 44100
@@ -163,8 +166,6 @@ def main() -> None:
     for n in score:
         audio += n.get_samples(rate)
 
-    # Open up a wav file
-    # consider switching to https://pypi.org/project/wavfile/
     output_file: pathlib.Path = test_song.parent / (test_song.stem + '.wav')
     wav_file = wave.open(str(output_file),"w")
 
@@ -175,11 +176,12 @@ def main() -> None:
     compname = "not compressed" # The only value supported by the python wave module
     wav_file.setparams((nchannels, samp_width, rate, nframes, comptype, compname))
 
-    logger.info('Writing to wav file.')
-    for sample in audio:
+    logger.info(f'Writing to {test_song.stem + ".wav"}.')
+    for sample in tqdm.tqdm(audio):
         wav_file.writeframes(struct.pack('h', sample))
 
     wav_file.close()
+    logger.info(f'Conversion Complete')
         
 if __name__ == "__main__":
     try:
