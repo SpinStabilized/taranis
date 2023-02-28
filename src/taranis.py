@@ -9,6 +9,7 @@ Plans -
 
 """
 from __future__ import annotations
+import argparse
 import mido
 import pathlib
 import struct
@@ -23,12 +24,11 @@ import taranislib
 logger = utils.taranis_logger_config()
 
 def main() -> None:
+    args: argparse.Namespace = utils.get_arguments()
+    print(args.input_file)
     logger.info('Taranis starting up.')
-    cwd: pathlib.Path = pathlib.Path().absolute()
-    test_song1: pathlib.Path = (cwd / 'resources/skye.mid').resolve()
-    test_song2: pathlib.Path = (cwd / 'resources/Mortal_Kombat.mid').resolve()
 
-    test_song: pathlib.Path = test_song2
+    test_song: pathlib.Path = args.input_file
 
     logger.info(f'Loading {test_song.name}')
     midi = mido.MidiFile(test_song)
@@ -37,7 +37,6 @@ def main() -> None:
         logger.error(f'No tracks found in {test_song.name}. Nothing to process.')
         return
     
-
     notes_track: int = -1
     control_tracks: list[int] = []
     
@@ -52,16 +51,9 @@ def main() -> None:
         else:
             control_tracks.append(i)
     
+    # print(midi.tracks[notes_track])
     logger.info(f'Notes will be taken from track {notes_track}.')
     logger.info(f'Control messages will also be processed from tracks: {control_tracks}')
-
-    # messages_to_ignore: list[str] = [
-    #     'time_signature',
-    #     'key_signature',
-    #     'end_of_track',
-    #     'channel_prefix',
-    #     'program_change',
-    # ]
 
     note_messages: list[taranislib.TaranisMessage] = []
     control_messages: list[taranislib.TaranisMessage] = []
@@ -78,14 +70,23 @@ def main() -> None:
                     note_on = message.note
                     message.tick = tick
                     note_messages.append(message)
+                    logger.info(f'Note On {note_on}')
+                elif message.type == 'note_on' and message.velocity == 0 and message.note == note_on:
+                    note_on = -1
+                    message.tick = tick
+                    note_messages.append(message)
+                    logger.warning(f'Note Off Via Velocity 0 - {message.note}') 
                 elif message.type == 'note_on' and note_on != -1:
-                    logger.warning(f'Note On when another note is aleady on. Ignoring.')
+                    logger.warning(f'Note On ({message.note}) when another note ({note_on}) is aleady on. Ignoring.')
+                    # pass                 
                 elif message.type == 'note_off' and message.note == note_on:
                     note_on = -1
                     message.tick = tick
                     note_messages.append(message)
+                    logger.warning(f'Note Off {message.note}')
                 elif message.type == 'note_off' and message.note != note_on:
-                    logger.warning(f'Note Off for note not already on. Ignoring.')
+                    # pass
+                    logger.warning(f'Note Off ({message.note}) for note not already on. Ignoring.')
             else:
                 message.tick = tick
                 control_messages.append(message)
@@ -113,7 +114,7 @@ def main() -> None:
                 case 'program_change' | 'control_change':
                     # Control Messages that are not processed
                     logger.warning(f'Ignoring "{m.type}" message.')
-                case 'channel_prefix' | 'end_of_track' | 'key_signature' | 'time_signature':
+                case 'channel_prefix' | 'end_of_track' | 'key_signature' | 'time_signature' | 'track_name':
                     # Meta Message Processing
                     logger.warning(f'Ignoring "{m.type}" meta message')
                 case _:
@@ -123,11 +124,23 @@ def main() -> None:
             m = note_messages.pop()
             match m.type:
                 case 'note_on':
-                    if current_note:
-                        logger.warning(f'Ignoring "note_on" at tick {m.tick} as a note is already on.')
+                    if m.velocity != 0:
+                        if current_note:
+                            logger.warning(f'Ignoring "note_on" at tick {m.tick} as a note is already on.')
+                        else:
+                            current_note = taranislib.Note(t, m.note, tempo=tempo, ticks_per_beat=ticks_per_beat)
+                            logger.info(f'Note {m.note} on at tick {t}')
                     else:
-                        current_note = taranislib.Note(t, m.note, tempo=tempo, ticks_per_beat=ticks_per_beat)
-                        # logger.info(f'Note {m.note} on at tick {t}')
+                        if current_note and current_note.note_number == m.note:
+                            current_note.end = t
+                            score_notes.append(current_note)
+                            current_note = None
+                            logger.info(f'Note {m.note} velocity zero at tick {t}')
+                        elif current_note and current_note.note_number != m.note:
+                          logger.warning(f'Ignoring "note_off" at tick {m.tick} that does not match currently on note.')
+                        else:
+                            logger.warning(f'Ignoring "note_off" at tick {m.tick} when no note is on.')
+                                           
                 case 'note_off':
                     if current_note and current_note.note_number == m.note:
                         current_note.end = t
@@ -157,8 +170,6 @@ def main() -> None:
         t = n.end + 1
         
         score.append(n)
-    # for n in score:
-    #     print(n.duration_s)
 
     logger.info('Generating audio samples.')
     rate = 44100

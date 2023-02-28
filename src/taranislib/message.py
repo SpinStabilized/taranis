@@ -22,6 +22,10 @@ class TaranisMessage:
         return self.message.dict()['time']
 
     @property
+    def velocity(self) -> int:
+        return self.message.dict()['velocity']
+
+    @property
     def is_control(self) -> bool:
         return self.message.dict()['type'] not in ['note_on', 'note_off']
     

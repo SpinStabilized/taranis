@@ -1,8 +1,20 @@
 # -*- coding: utf-8 -*-
+"""Objects representing notes for conversion to PWM.
+
+This module implements objects that define note information into Pulse Width
+Modulation (PWM) signals.
+
+"""
 import math
 import mido
 
 class Note:
+    """A single note with information necessary to build the audio PWM signal.
+
+    Attributes:
+        likes_spam: A boolean indicating if we like SPAM or not.
+        eggs: An integer count of the eggs we have laid.
+    """
     def __init__(self, start: int, note_number: int, tempo: int = 500000, ticks_per_beat: int = 0, tuning: int = 440):
         self._start: int = start
         self._end: int = start
@@ -16,6 +28,8 @@ class Note:
 
     @property
     def start(self) -> int:
+        """The note starting tick.
+        """
         return self._start
     @start.setter
     def start(self, start: int) -> None:
@@ -26,6 +40,8 @@ class Note:
     
     @property
     def end(self) -> int:
+        """The note ending tick.
+        """
         return self._end
     @end.setter
     def end(self, end: int) -> None:
@@ -36,6 +52,8 @@ class Note:
     
     @property
     def note_number(self) -> int:
+        """The midi note number
+        """
         return self._note_number
     @note_number.setter
     def note_number(self, note_number: int) -> None:
@@ -46,10 +64,14 @@ class Note:
     
     @property
     def duration(self) -> int:
+        """Note duration in ticks.
+        """
         return self.end - self.start
     
     @property
     def duration_s(self) -> float:
+        """Note duration in seconds.
+        """
         return mido.tick2second(self.duration, self.ticks_per_beat, self.tempo)
 
     @property
@@ -64,21 +86,15 @@ class Note:
             The frequency in Hertz of the note.
         """
         return (2 ** ((self.note_number - 69) / 12)) * self.tuning
-    
-    # def check(self) -> float:
-    #     p: float = 1 / self.frequency
-    #     n: float = self.duration_s / p
 
     def get_samples(self, rate: int) -> list[int]:
         duration: float = self.duration_s * 1000
         period: float = 1 / self.frequency
         waves: float = self.duration_s / period
         duration = math.floor(waves * period * 1000)
-        # duration = math.floor(self.duration_s / (1 / self.frequency)) * 1000
         num_samples: int = math.floor(duration * (rate / 1000.0))
         frequency: float = self.frequency
         samples_float: list[float] = [1.0 * math.sin(2 * math.pi * frequency * ( x / rate )) for x in range(num_samples)]
-        # samples_int: list[int] = [int(s * 32767) for s in samples_float]
         samples_int: list[int] = [32767 if s > 0 else -32768 for s in samples_float]
         return samples_int
 

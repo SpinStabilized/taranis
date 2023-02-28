@@ -8,12 +8,13 @@ from typing import Final
 TARANIS_LOGGER_ID: Final[str] = 'taranis'
 logger = logging.getLogger(TARANIS_LOGGER_ID)
 
-TARANIS_LOG_FILE: Final[pathlib.Path] = pathlib.Path(f'../logs/{TARANIS_LOGGER_ID}.log')
+TARANIS_LOG_FILE: Final[pathlib.Path] = pathlib.Path(f'logs/{TARANIS_LOGGER_ID}.log')
 
 def taranis_logger_config(level: int = logging.INFO) -> logging.Logger:
     """Configure the taranis logger
     Provides a logger that outputs to both the console and to a log
     file. The log file is configured to rotate every night at midnight.
+    
     Parameters
     ----------
     level
