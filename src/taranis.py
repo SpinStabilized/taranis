@@ -50,8 +50,7 @@ def main() -> None:
                 logger.warning(f'Track {i} has notes but track {notes_track} already has notes. Track {i} will be ignored.')
         else:
             control_tracks.append(i)
-    
-    # print(midi.tracks[notes_track])
+
     logger.info(f'Notes will be taken from track {notes_track}.')
     logger.info(f'Control messages will also be processed from tracks: {control_tracks}')
 
@@ -103,7 +102,6 @@ def main() -> None:
     t: int = 0
     current_note: taranislib.Note | None = None
     m: taranislib.TaranisMessage
-    # print(note_messages)
     while t <= max_ticks:
         if control_messages and control_messages[-1].tick == t:
             m = control_messages.pop()
