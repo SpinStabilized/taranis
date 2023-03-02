@@ -14,7 +14,7 @@
   <h3 align="center">Taranis</h3>
 
   <p align="center">
-    Convert MIDI to PWM wav for use with a tesla coil.
+    Convert MIDI to square-wave audio wav for use with a tesla coil.
     ·
     <a href="https://github.com/SpinStabilized/taranis/issues">Report Bug</a>
     ·
@@ -62,8 +62,8 @@
 [![DBot Screenshot][product-screenshot]](https://github.com/SpinStabilized/dbot)
 -->
 
-A bit of software to convert a simple MIDI file into a PWM audio wav file for
-use with a musical tesla coil. Just getting started.
+A bit of software to convert a simple MIDI file into a square-wave audio wav
+file for use with a musical tesla coil. Just getting started.
 
 ### Built With
 
