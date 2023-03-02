@@ -1,12 +1,6 @@
 # -*- coding: utf-8 -*-
 """Taranis, get ready to listen to the ligtning.
 
-Plans - 
-    - Collapse tracks to one set of track information and deconflict multiple
-    notes so that only one is played per time.
-    - Calculate in rests and treat them as notes as well
-    - Convert tempo to actual time calculations
-
 """
 from __future__ import annotations
 import argparse
@@ -182,7 +176,7 @@ def main() -> None:
     samp_width = 2              # 16-bit samples (2 bytes)
     nframes = len(audio)
     comptype = "NONE"           # The only value supported by the python wave module
-    compname = "not compressed" # The only value supported by the python wave module
+    compname = "not" # The only value supported by the python wave module
     wav_file.setparams((nchannels, samp_width, rate, nframes, comptype, compname))
 
     logger.info(f'Writing to {test_song.stem + ".wav"}.')
