@@ -23,3 +23,4 @@ Pipfile.lock text eol=lf
 # Binary Files #
 ################
 *.mid
+*.wav
