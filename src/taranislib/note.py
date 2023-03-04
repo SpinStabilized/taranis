@@ -11,9 +11,6 @@ import mido
 class Note:
     """A single note with information necessary to build the audio PWM signal.
 
-    Attributes:
-        likes_spam: A boolean indicating if we like SPAM or not.
-        eggs: An integer count of the eggs we have laid.
     """
     def __init__(self, start: int, note_number: int, tempo: int = 500000, ticks_per_beat: int = 0, tuning: int = 440):
         self._start: int = start
@@ -94,7 +91,7 @@ class Note:
         duration = math.floor(waves * period * 1000)
         num_samples: int = math.floor(duration * (rate / 1000.0))
         frequency: float = self.frequency
-        samples_float: list[float] = [1.0 * math.sin(2 * math.pi * frequency * ( x / rate )) for x in range(num_samples)]
+        samples_float: list[float] = [math.sin(2 * math.pi * frequency * ( x / rate )) for x in range(num_samples)]
         samples_int: list[int] = [32767 if s > 0 else -32768 for s in samples_float]
         return samples_int
 
@@ -105,7 +102,7 @@ class Rest(Note):
         self.end = end
     
     def __repr__(self) -> str:
-        return f'<taranislib.Rest {self.start}:{self.end}>'
+        return f'<taranislib.Rest({self.start}, {self.end}, tempo={self.tempo}>'
 
     @property
     def note_number(self) -> int:
